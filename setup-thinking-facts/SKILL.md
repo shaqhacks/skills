@@ -1,40 +1,55 @@
 ---
 name: setup-thinking-facts
 description: >-
-  Replace Claude Code's whimsical "thinking" spinner words (Discombobulating…,
-  Frolicking…) with interesting, true one-sentence facts from subjects the user
-  picks — history, biology, math, astronomy, science, art, anything. Use this
+  Replace Claude Code's "thinking" filler with interesting, true facts shown on
+  the "Tip:" line beneath the spinner — from subjects the user picks (history,
+  space, biology, math, art, anything), in short or in-depth form. Use this
   whenever the user wants to customize, change, or personalize what shows while
-  Claude is thinking/working, wants trivia or facts on the spinner, wants to
-  learn something while they wait, or says things like "change the thinking
-  words," "show me facts while you think," "replace the spinner text," or "I want
-  history facts when you're working." It gathers fresh facts for the chosen
-  subjects and writes them into the spinnerTips setting safely. This is a
-  one-time SETUP task, not an ongoing behavior — run it, and the facts then show
-  on their own in every new session.
+  Claude is thinking/working, wants trivia or facts while they wait, wants to
+  learn something during pauses, or says things like "change the thinking words,"
+  "show me facts while you think," "put facts in the spinner," or "I want history
+  facts when you're working." It writes the facts into the spinnerTipsOverride
+  setting and leaves the glowing spinner word at its defaults. This is a one-time
+  SETUP task, not an ongoing behavior — run it, and the facts then show on their
+  own in every new session.
 ---
 
 # Setup Thinking Facts
 
 ## What this does and why it works this way
 
-Claude Code draws those playful gerunds ("Ruminating…", "Discombobulating…")
-next to the spinner while it works. The CLI reads the candidate strings from a
-setting called **`spinnerTips`** in `~/.claude/settings.json` and rotates
-through them randomly. So the way to show facts while Claude thinks is not a
-running program or a hook — there is no hook that fires during thinking — it is
-simply to fill `spinnerTips` with good facts. That is what this skill does.
+Claude Code shows a short helpful "Tip:" line beneath the spinner while it works.
+The CLI reads custom strings for that line from a setting called
+**`spinnerTipsOverride`** in `~/.claude/settings.json`, and only shows them when
+the master toggle **`spinnerTipsEnabled`** is on. So the way to show facts while
+Claude thinks is not a running program or a hook — there is no hook that fires
+during thinking — it is simply to fill `spinnerTipsOverride` with good facts and
+make sure `spinnerTipsEnabled` is true. That is what the bundled script does.
+
+The exact key name matters and has bitten this skill before: the CLI reads
+`spinnerTipsOverride`, **not** a key named `spinnerTips`. Writing to `spinnerTips`
+puts a tidy-looking block in settings.json that the CLI silently ignores, so the
+facts never appear. Always go through the script — it writes the correct keys.
+
+This skill puts facts on the **Tip line** and leaves the bright, glowing spinner
+word ("Discombobulating…") at Claude Code's defaults. (We tried putting facts in
+the glowing word instead; it's eye-catching but it's a single short line that
+shares space with the status text and clips longer facts, so the Tip line — which
+has room to wrap — is the better home for real facts.) The script clears any
+leftover `spinnerVerbs` override from that experiment so the default gerunds come
+back.
 
 Because the spinner reads a fixed list from the config, the facts are gathered
-**once at setup** (fresh from the web) and stored. To refresh them later, the
-user just runs this skill again. Each tip must be short — roughly one sentence —
-because anything wider than the terminal line gets cut off.
+**once at setup** and stored. To refresh them later, the user just runs this
+skill again.
 
-The setting shape (verified against the installed CLI):
+The setting shape the CLI reads
+(`spinnerTipsOverride: { tips: string[], excludeDefault?: boolean }`):
 
 ```json
 {
-  "spinnerTips": {
+  "spinnerTipsEnabled": true,
+  "spinnerTipsOverride": {
     "tips": ["fact one", "fact two", "..."],
     "excludeDefault": true
   }
@@ -42,100 +57,100 @@ The setting shape (verified against the installed CLI):
 ```
 
 `excludeDefault: true` shows only the user's facts; `false` mixes them with the
-built-in gerunds. Default to `true` — the user is here to replace the gerunds
-with facts, so honor that unless they say they want to keep the originals too.
+built-in tips. Default to `true` — the user is here to see their facts — unless
+they say they want to keep the originals too.
 
 ## The workflow
 
 ### 1. Get the subjects and the fact length
 
-This is a real conversation — ask, then wait for the answer. Two things to
-settle before gathering anything:
+Settle two things before writing any facts: which subjects, and how long.
 
-**Subjects.** If the user already named subjects ("history and astronomy"), use
-those and don't re-ask. If they didn't, present a menu and let them pick — a
-numbered list is easiest to answer:
+**Subjects — use a multi-select checkbox prompt.** If the user already named their
+subjects ("history and astronomy"), use those and don't re-ask. Otherwise present
+the menu as an interactive **multi-select** prompt (the `AskUserQuestion` tool
+with `multiSelect: true`) so they can tick boxes rather than typing a list back.
 
-> Which subjects would you like facts from? Pick any number of these, or name
-> your own:
-> 1. History   2. Astronomy/Space   3. Biology   4. Math
-> 5. Physics   6. Chemistry   7. Geography   8. Art
-> 9. Technology   10. Language/Words
+One hard constraint: **`AskUserQuestion` allows at most 4 options per question** —
+a single ten-item list throws "Invalid tool parameters" and the prompt never
+appears. So split the subjects across a few grouped multi-select questions of up
+to four options each (the tool accepts several questions in one call, shown
+together). A natural split is two groups, e.g.:
 
-**Fact length.** Ask whether they want them **short or in-depth** — people differ
-on this and it changes how the facts read:
+> **Science:** Astronomy/Space · Biology · Physics · Chemistry
+> **Humanities & other:** History · Math · Geography · Art & Technology
 
-> And do you want short one-line facts, or longer in-depth ones?
+Make clear in each question that they can pick several and that the choices
+combine; the auto-provided "Other" option lets them name their own subject.
 
-- **Short** — a single tight sentence (~120 characters). Fits the spinner line
-  cleanly. This is the safe default if they don't care.
-- **In-depth** — two or three sentences (up to ~280 characters) with a bit more
-  explanation. Worth flagging honestly: the spinner is a *one-line* element, so
-  longer facts may wrap or get clipped depending on terminal width. Offer it,
-  but tell them they may want to see how it looks and can re-run for short if
-  it's too cramped.
+**Fact length.** Then ask whether they want facts **short or in-depth** — people
+differ on this and the Tip line can hold either. A single-select question is fine
+here (it's one choice):
 
-One default worth keeping silent: replace the gerunds entirely
-(`excludeDefault: true`) unless they say they want to keep the originals mixed
-in. Don't interrogate them on it.
+> Do you want short one-line facts, or longer in-depth ones?
 
-### 2. Gather the facts — fresh, true, and tight
+- **Short** — a single tight sentence (~120 characters). Compact and quick to
+  read. A safe default if they don't care.
+- **In-depth** — two or three sentences (up to ~280 characters) that use the extra
+  room to explain *why* the fact is interesting. The Tip line wraps to fit, so
+  length is fine; just don't pad.
+
+You can fold both into one `AskUserQuestion` call (the subject groups plus the
+length question) so setup is a single interaction.
+
+### 2. Gather the facts — true, varied, and the right length
 
 This is the part that makes the result good or bad, so spend your effort here.
-For each subject, pull genuinely interesting facts. **Prefer the web**
-(WebSearch / WebFetch) so they're fresh and sourced rather than the same dozen
-facts everyone has seen; if web tools are unavailable, fall back to your own
-knowledge, but stay strictly to things you are confident are true.
+**Write the facts directly from your own knowledge — do not browse the web.** That
+keeps setup instant: hitting the web for each subject means a string of tool
+calls the user has to approve one by one, turning a quick task into a slog of
+permission prompts. You already know more genuinely interesting, accurate facts
+than a spinner needs, so just write them. They regenerate fresh every time the
+user re-runs this skill, so the rotation never goes stale. (Only use WebSearch if
+the user *explicitly* asks to source facts online.)
 
-**Gather a generous pool — roughly 20–30 per subject.** The pool is what the
-spinner rotates through, and the user asked for it not to feel like a tiny
-static list, so err on the side of more. There's no live re-fetching: the
-spinner reads this fixed pool, and the user refreshes it by re-running this
-skill. A big, varied pool is what keeps it from going stale.
+**Gather a generous pool — roughly 20–30 per subject** so the rotation feels
+alive rather than like a tiny static list.
 
 Hold every fact to this bar:
 
-- **True and not a myth.** This is the whole game — a spinner full of
-  confidently-stated falsehoods is worse than the gerunds. Actively avoid the
-  popular ones that are wrong (the Great Wall is *not* visible from space with
-  the naked eye; we use far more than 10% of our brains; glass is *not* a slow
-  liquid). When unsure, drop it rather than ship a maybe.
-- **The right length for their choice.** Short mode: a single sentence, ~120
-  characters. In-depth mode: two or three sentences, up to ~280 characters,
-  using the extra room to explain *why* the fact is interesting, not to pad.
-  Either way, tighten "It is a little-known fact that…" down to the fact itself.
+- **The right length for their choice.** Short: a single sentence, ~120 chars.
+  In-depth: two or three sentences, up to ~280 chars, using the extra room to
+  explain why it's interesting, not to pad. Either way, tighten "It is a
+  little-known fact that…" down to the fact itself.
+- **Prefixed with its subject**, e.g. `History Fact — …`, `Astronomy Fact — …`,
+  so the reader knows where each fact comes from. (An em dash reads cleanly.)
+- **True and not a myth.** This is the whole game — a spinner of confidently-stated
+  falsehoods is worse than the defaults. Avoid the popular wrong ones (the Great
+  Wall is not visible from space with the naked eye; we use far more than 10% of
+  our brains; glass is not a slow liquid). When unsure, drop it.
 - **Self-contained and surprising.** It should land without setup and make the
   user think "huh, neat." Concrete numbers and specifics beat vague claims.
-- **Varied within a subject.** Don't give twenty facts about the same battle or
-  the same animal. Spread across the subject.
-- **Clean.** Safe-for-work, non-political, non-gory. This shows up constantly
-  while they work; keep it delightful, not jarring.
+- **Varied within a subject** (don't give twenty facts about the same battle), and
+  **clean** (safe-for-work, non-political, non-gory) — it shows constantly.
 
-Write the assembled pool to a JSON file as a flat array of strings. **Use a
-unique filename** — never a fixed shared path like `/tmp/thinking-facts.json`,
-because two runs (or a re-run) would overwrite each other's facts mid-flight.
-Generate a unique name, e.g. with `mktemp`:
+Write the pool to a JSON file as a flat array of strings. **Use a unique
+filename** — never a fixed shared path like `/tmp/facts.json`, since a re-run
+would collide. Generate one with `mktemp`:
 
 ```bash
 FACTS=$(mktemp -t thinking-facts.XXXXXX) ; echo "$FACTS"
-# then write the JSON array to "$FACTS"
+# then write the JSON array of subject-prefixed facts to "$FACTS"
 ```
 
 ```json
-["Honey found in 3,000-year-old Egyptian tombs was still edible.",
- "A day on Venus is longer than its year.",
- "The '+' and '=' keys share a key because Robert Recorde invented '=' in 1557."]
+["Astronomy Fact — A day on Venus is longer than its year.",
+ "History Fact — Honey found in 3,000-year-old Egyptian tombs was still edible."]
 ```
 
-(If you'd rather not create a file at all, the script also accepts the array on
-stdin via `--stdin`, which sidesteps the collision entirely.)
+(The script also accepts the array on stdin via `--stdin`.)
 
 ### 3. Write it into the setting with the bundled script
 
-Do **not** hand-edit `settings.json` — it holds the user's whole configuration
-and a slip could corrupt it. Use the bundled script, which backs up the file,
-changes only the `spinnerTips` key, and refuses to write if the existing file is
-unparseable:
+Do **not** hand-edit `settings.json` — it holds the user's whole configuration and
+a slip could corrupt it. Use the bundled script, which backs up the file, writes
+only the Tip-line keys (and clears any leftover glowing-word override), and
+refuses to write if the existing file is unparseable:
 
 ```bash
 python3 <skill-dir>/scripts/apply_spinner_tips.py \
@@ -145,42 +160,41 @@ python3 <skill-dir>/scripts/apply_spinner_tips.py \
 ```
 
 Set `--max-len` to match the chosen length: ~140 for short, ~300 for in-depth
-(otherwise the script will skip the longer in-depth facts as too long). Other
-flags: `--settings PATH` (default `~/.claude/settings.json`), `--mode append` to
-add to an existing pool instead of replacing it, `--stdin` to pipe the facts
-instead of a file, `--dry-run` to preview. The script cleans whitespace, drops
-blanks/duplicates, and skips anything over the limit, then reports how many tips
+(otherwise the script drops the longer in-depth facts as too long). Other flags:
+`--settings PATH` (default `~/.claude/settings.json`), `--mode append` to add to
+an existing pool, `--stdin` to pipe the facts, `--dry-run` to preview. The script
+cleans whitespace, drops blanks/dupes/over-length entries, and reports how many
 it installed.
 
 ### 4. Confirm and tell them what to expect
 
 Report back plainly:
-- which subjects and which length (short / in-depth) you set up — **do not state
-  a fact count.** The user doesn't need a number, and a finite "42 facts" reads
-  as a small fixed list when the intent is an open-ended, refreshable set. The
-  script prints a count to its own output; that's for you, not for the reply.
-- that it takes effect **in a new session** (the spinner list is read at
-  startup), so they should start a fresh `claude` to see it,
-- that there's no live re-fetch — to pull a brand-new batch later, just **re-run
-  this skill**; the big pool keeps the rotation from feeling repetitive in the
-  meantime,
-- if they chose in-depth: that longer facts may wrap or clip on a narrow
-  terminal, and they can re-run for short if it looks cramped,
+- which subjects and which length (short / in-depth) you set up — **do not state a
+  fact count.** A finite "42 facts" reads as a small fixed list when the intent is
+  an open-ended, refreshable set.
+- that it takes effect **in a new session** (the list is read at startup), so they
+  should start a fresh `claude` to see it,
+- that the facts show on the **Tip line** beneath the spinner; the glowing word
+  stays Claude Code's normal gerunds,
+- that to pull a fresh batch later they just **re-run this skill**,
 - that the previous settings were backed up to `settings.json.bak`,
-- how to undo it: remove the `spinnerTips` block from `~/.claude/settings.json`
-  (or restore the `.bak`).
+- how to undo it: remove the `spinnerTipsOverride` block from
+  `~/.claude/settings.json` (or set `spinnerTipsEnabled` to false, or restore the
+  `.bak`).
 
-Show them three or four sample facts from the pool so they get a taste of what
-they'll see.
+Show them three or four sample facts so they get a taste of what they'll see.
 
 ## Quality checklist
 
-- If the user didn't name subjects, did I show the menu and let them pick?
-- Did I ask short vs. in-depth (and match the fact length + `--max-len` to it)?
+- If the user didn't name subjects, did I offer them as a multi-select checkbox
+  prompt, split into groups of ≤4 options each (the tool's per-question limit)?
+- Did I ask short vs. in-depth, and match the fact length + `--max-len` to it?
+- Did I write the facts from my own knowledge (no unprompted web browsing), so
+  setup stayed fast and approval-free?
 - Did I gather a generous pool (~20–30 per subject) so it doesn't feel static?
+- Did I prefix each fact with its subject (`History Fact — …`)?
 - Are all facts things I'm confident are TRUE — no popular myths?
 - Did I write facts to a UNIQUE filename (never a fixed shared path)?
-- Are they varied and genuinely interesting, not the tired greatest-hits?
 - Did I write through the script (with its backup), never by hand-editing JSON?
 - Did I tell them it takes effect in a new session, how to refresh, and how to
   revert?
