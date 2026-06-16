@@ -184,6 +184,27 @@ Report back plainly:
 
 Show them three or four sample facts so they get a taste of what they'll see.
 
+## Automatic weekly refresh (rotating bank)
+
+For a hands-off "fresh facts over time" setup, this skill ships a large prebuilt
+fact bank and a rotation script instead of relying on the user to re-run it:
+
+- `data/facts-bank.json` — a bank of ~500 true, subject-prefixed in-depth facts
+  (balanced across subjects). Big enough that weekly rotation won't repeat for a
+  long time, so it rarely needs regenerating.
+- `scripts/weekly_rotate.py` — picks a deterministic slice of the bank (default
+  150 facts) seeded by the ISO week, so the visible set changes every week but is
+  stable within a week. It installs the slice through `apply_spinner_tips.py`
+  (same safe write + backup).
+- A weekly **local** cron entry runs the rotation:
+  `0 9 * * 1 /usr/bin/python3 <skill-dir>/scripts/weekly_rotate.py >> <skill-dir>/data/refresh.log 2>&1`
+
+This is intentionally a *local* cron job, not a cloud routine: the spinner config
+lives in the user's local `~/.claude/settings.json`, which cloud agents can't
+reach. macOS may ask for permission the first time cron runs; the run is logged to
+`data/refresh.log`. To regenerate the bank with brand-new facts, fan out
+per-subject generators and overwrite `facts-bank.json`.
+
 ## Quality checklist
 
 - If the user didn't name subjects, did I offer them as a multi-select checkbox
