@@ -22,8 +22,9 @@ Options:
   --stdin             Read the JSON array of facts from stdin instead of a file
   --mode MODE         'replace' (default) shows only your facts as the spinner
                       word; 'append' mixes them with Claude Code's built-in verbs
-  --max-len N         Drop any fact longer than N chars (default: 45). The verb
-                      shares its line with the live status text, so long facts get
+  --max-len N         Drop any fact longer than N chars (default: 36). The verb
+                      shares its line with the live status text (time + token
+                      count), so on an 80-column terminal facts over ~36 chars get
                       clipped — keep them short.
   --dry-run           Print what would be written without modifying the file
 
@@ -67,7 +68,7 @@ def main():
     p.add_argument("--facts-file")
     p.add_argument("--stdin", action="store_true")
     p.add_argument("--mode", choices=["replace", "append"], default="replace")
-    p.add_argument("--max-len", type=int, default=45)
+    p.add_argument("--max-len", type=int, default=36)
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args()
 

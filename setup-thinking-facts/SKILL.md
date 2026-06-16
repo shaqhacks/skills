@@ -104,9 +104,15 @@ the user *explicitly* asks to source facts online.)
 
 Hold every fact to this bar:
 
-- **Short enough to fit the glowing line — aim for ~45 characters or less,**
-  including the subject prefix. The verb shares its row with the status text, so
-  longer facts get clipped. Trim hard; favor the punchiest version of the fact.
+- **Short enough to fit the glowing line — aim for ~36 characters or less,**
+  including the subject prefix. This is the constraint that bites: the verb
+  shares its row with the live status, e.g. `(1m 30s · ↓ 145.2k tokens ·
+  thinking)`, which can run ~35–40 columns. On a standard 80-column terminal that
+  leaves only ~36 for the fact; anything longer gets clipped mid-word (the CLI
+  truncates the line to the terminal width). So count the characters — prefix
+  included — and keep each at/under ~36. Trim hard; favor the punchiest version
+  of the fact. If a subject's natural phrasing won't fit, shorten the wording
+  (abbreviate, drop filler) rather than letting it spill over.
 - **Prefixed with its short subject tag, e.g. `History: …`, `Astronomy: …`.** Use
   the bare subject plus a colon (not "History Fact:") to save precious room. This
   tells the user which subject each glowing fact is from.
@@ -150,11 +156,13 @@ write if the existing file is unparseable:
 
 ```bash
 python3 <skill-dir>/scripts/apply_spinner_facts.py \
-  --facts-file "$FACTS" --mode replace --max-len 45
+  --facts-file "$FACTS" --mode replace --max-len 36
 ```
 
-Keep `--max-len` around 45 so over-long facts are dropped rather than clipped on
-the spinner line. Other flags: `--settings PATH` (default
+Keep `--max-len` around 36 (for an 80-column terminal) so over-long facts are
+dropped rather than clipped on the spinner line. The script reports how many it
+dropped — if that number isn't zero, your facts are too long; rewrite them
+shorter instead of shipping a thinned pool. Other flags: `--settings PATH` (default
 `~/.claude/settings.json`), `--mode append` to mix with the built-in gerunds,
 `--stdin` to pipe the facts, `--dry-run` to preview. The script cleans
 whitespace, drops blanks/dupes/over-length entries, and reports how many it
@@ -183,7 +191,9 @@ Show them three or four sample facts so they get a taste of what they'll see.
   prompt, split into groups of ≤4 options each (the tool's per-question limit)?
 - Did I write the facts from my own knowledge (no unprompted web browsing), so
   setup stayed fast and approval-free?
-- Is every fact **short (~45 chars or less)** and prefixed with its subject
+- Is every fact **short (~36 chars or less, prefix included)** so it won't be
+  clipped by the status text on an 80-column terminal, and prefixed with its
+  subject
   (`History: …`), so it fits the glowing line without being clipped?
 - Did I gather a generous pool (~20–30 per subject) so it doesn't feel static?
 - Are all facts things I'm confident are TRUE — no popular myths?
