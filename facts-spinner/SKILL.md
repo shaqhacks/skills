@@ -1,5 +1,5 @@
 ---
-name: setup-thinking-facts
+name: facts-spinner
 description: >-
   Replace Claude Code's "thinking" filler with interesting, true facts shown on
   the "Tip:" line beneath the spinner — from subjects the user picks (history,
