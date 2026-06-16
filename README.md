@@ -11,12 +11,13 @@ strictly technical register and pauses at genuine decision points to ask you a
 question — so your engineering judgment stays sharp instead of atrophying.
 Dials back automatically when you say you're in a hurry.
 
-### `setup-thinking-facts`
-Replaces Claude Code's whimsical "thinking" spinner words (Discombobulating…,
-Frolicking…) with true, interesting facts from subjects you pick — history,
-biology, math, astronomy, and more. It gathers fresh facts from the web and
-writes them into your `spinnerTips` setting. Run it, pick your subjects and
-whether you want short or in-depth facts, then start a new session to see them.
+### `facts-spinner`
+Shows true, interesting facts on the "Tip:" line beneath Claude Code's spinner
+while it works — from subjects you pick (history, space, biology, math, art, and
+more), in short or in-depth form. Facts are written from Claude's own knowledge
+(no web calls, no approval prompts) into your `spinnerTipsOverride` setting,
+leaving the glowing spinner word at its defaults. Run it, tick your subjects in a
+checkbox prompt, choose short or in-depth, then start a new session to see them.
 
 ## Installing a skill
 
@@ -27,12 +28,12 @@ into `~/.claude/skills/`:
 ```bash
 git clone https://github.com/shaqhacks/skills.git
 cp -R skills/coding-mentor ~/.claude/skills/
-cp -R skills/setup-thinking-facts ~/.claude/skills/
+cp -R skills/facts-spinner ~/.claude/skills/
 ```
 
 Skills are picked up at the start of a new session. Invoke one explicitly with
-`/coding-mentor` or `/setup-thinking-facts`, or let it trigger automatically
-based on its description.
+`/coding-mentor` or `/facts-spinner`, or let it trigger automatically based on
+its description.
 
 ## License
 
