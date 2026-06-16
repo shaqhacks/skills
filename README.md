@@ -19,6 +19,8 @@ more), in short or in-depth form. Facts are written from Claude's own knowledge
 leaving the glowing spinner word at its defaults. Run it, tick your subjects in a
 checkbox prompt, choose short or in-depth, then start a new session to see them.
 
+![facts-spinner showing a Chemistry fact on the Tip line beneath the spinner](facts-spinner/demo.png)
+
 ## Installing a skill
 
 Each top-level folder is a self-contained skill. To install one globally (so
