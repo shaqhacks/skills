@@ -1,33 +1,30 @@
 #!/usr/bin/env python3
-"""Safely merge a pool of fact strings into Claude Code's spinner-tips setting.
+"""Safely write a pool of fact strings into Claude Code's spinnerVerbs setting.
 
-The CLI reads custom spinner tips from the `spinnerTipsOverride` key (shape:
-{"tips": [...], "excludeDefault": bool}) and gates the whole feature behind the
-`spinnerTipsEnabled` master toggle. This script writes BOTH: it fills
-spinnerTipsOverride with the facts and sets spinnerTipsEnabled:true so the tips
-actually appear. (An earlier version wrote a key named `spinnerTips`, which the
-CLI does not read — so the facts never showed. This script also removes that
-dead legacy key when it finds it.)
+The CLI renders the bright, shimmering spinner word (the "Discombobulating…"
+element) from the `spinnerVerbs` key, shape
+`{"mode": "append"|"replace", "verbs": [...]}`. Putting facts there makes them
+glow with the `claudeShimmer` animation. This skill only ever writes that key —
+it deliberately leaves the dim "Tip:" line at Claude Code's defaults.
 
 Why this is a script and not inline edits: settings.json holds the user's whole
 Claude Code configuration. A naive write could clobber unrelated keys or corrupt
-the file. This reads the existing JSON, changes ONLY the spinner-tip keys, writes
-a .bak first, and refuses to proceed if the existing file isn't parseable —
-so a malformed settings file fails loudly instead of being silently destroyed.
+the file. This reads the existing JSON, changes ONLY the spinnerVerbs key, writes
+a .bak first, and refuses to proceed if the existing file isn't parseable — so a
+malformed settings file fails loudly instead of being silently destroyed.
 
 Usage:
-  apply_spinner_tips.py --facts-file facts.json [options]
+  apply_spinner_facts.py --facts-file facts.json [options]
 
 Options:
   --settings PATH     Target settings file (default: ~/.claude/settings.json)
   --facts-file PATH   JSON array of fact strings to install (required unless --stdin)
   --stdin             Read the JSON array of facts from stdin instead of a file
-  --mode MODE         'replace' (default) overwrites the tip pool; 'append' adds
-                      to whatever tips are already configured (deduped)
-  --exclude-default BOOL  'true' (default) shows ONLY your facts; 'false' mixes
-                          them with Claude Code's built-in spinner gerunds
-  --max-len N         Drop/flag any fact longer than N chars (default: 160) so
-                      tips fit the spinner line instead of being truncated
+  --mode MODE         'replace' (default) shows only your facts as the spinner
+                      word; 'append' mixes them with Claude Code's built-in verbs
+  --max-len N         Drop any fact longer than N chars (default: 45). The verb
+                      shares its line with the live status text, so long facts get
+                      clipped — keep them short.
   --dry-run           Print what would be written without modifying the file
 
 Exit codes: 0 ok, 1 usage/IO error, 2 existing settings unparseable (no write).
@@ -70,17 +67,12 @@ def main():
     p.add_argument("--facts-file")
     p.add_argument("--stdin", action="store_true")
     p.add_argument("--mode", choices=["replace", "append"], default="replace")
-    p.add_argument("--target", choices=["tips", "verbs"], default="tips",
-                   help="'tips' = the dim Tip: line (spinnerTipsOverride); "
-                        "'verbs' = the bright glowing spinner word (spinnerVerbs)")
-    p.add_argument("--exclude-default", default="true")
-    p.add_argument("--max-len", type=int, default=160)
+    p.add_argument("--max-len", type=int, default=45)
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args()
 
     if not args.facts_file and not args.stdin:
         p.error("provide --facts-file or --stdin")
-    exclude_default = str(args.exclude_default).strip().lower() in ("1", "true", "yes")
 
     try:
         facts = load_facts(args)
@@ -107,32 +99,15 @@ def main():
                   f"Fix or remove it, then re-run.", file=sys.stderr)
             return 2
 
-    if args.target == "verbs":
-        # The bright, shimmering spinner word (the "Discombobulating…" element).
-        # The CLI handles append/replace against its built-in verbs natively, so
-        # just hand it {mode, verbs}. These share the spinner line with the
-        # "(esc to interrupt)" hint, so keep them short (use a small --max-len).
-        settings["spinnerVerbs"] = {"mode": args.mode, "verbs": facts}
-        target_desc = f"spinnerVerbs (mode={args.mode})"
-    else:
-        if args.mode == "append":
-            existing = []
-            cur = settings.get("spinnerTipsOverride")
-            if isinstance(cur, dict) and isinstance(cur.get("tips"), list):
-                existing = [t for t in cur["tips"] if isinstance(t, str)]
-            facts, _ = clean(existing + facts, args.max_len)
-        # The CLI reads custom tips from spinnerTipsOverride and only shows them
-        # when spinnerTipsEnabled is on, so write both. Drop the dead legacy
-        # 'spinnerTips' key if a prior version left one behind.
-        settings.pop("spinnerTips", None)
-        settings["spinnerTipsOverride"] = {"tips": facts, "excludeDefault": exclude_default}
-        settings["spinnerTipsEnabled"] = True
-        target_desc = f"spinnerTipsOverride (excludeDefault={exclude_default}, spinnerTipsEnabled=true)"
+    # The CLI handles append/replace against its built-in verbs natively, so just
+    # hand it {mode, verbs}. We touch ONLY spinnerVerbs — the dim Tip: line is
+    # left at the user's existing/default configuration on purpose.
+    settings["spinnerVerbs"] = {"mode": args.mode, "verbs": facts}
     rendered = json.dumps(settings, indent=2, ensure_ascii=False) + "\n"
 
     if args.dry_run:
         print(rendered)
-        print(f"[dry-run] {len(facts)} entries -> {target_desc}, "
+        print(f"[dry-run] {len(facts)} verbs (mode={args.mode}), "
               f"dropped {len(dropped)} over-length", file=sys.stderr)
         return 0
 
@@ -142,11 +117,13 @@ def main():
     with open(path, "w", encoding="utf-8") as f:
         f.write(rendered)
 
-    print(f"Wrote {len(facts)} entries to {path} via {target_desc}.")
+    print(f"Wrote {len(facts)} glowing spinner facts to {path} "
+          f"via spinnerVerbs (mode={args.mode}).")
     if os.path.exists(path + ".bak"):
         print(f"Previous settings backed up to {path}.bak")
     if dropped:
-        print(f"Skipped {len(dropped)} fact(s) longer than {args.max_len} chars.")
+        print(f"Skipped {len(dropped)} fact(s) longer than {args.max_len} chars "
+              f"(would be clipped on the spinner line).")
     print("Takes effect in a NEW Claude Code session.")
     return 0
 
