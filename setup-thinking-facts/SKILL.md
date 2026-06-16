@@ -37,9 +37,11 @@ places text can go, and they're very different:
   user keeps Claude Code's normal tips.
 
 Because "glowing" and "long" can't coexist (the glow lives only on the short
-verb), this skill commits to **short, glowing facts**. If a user specifically
-wants long in-depth facts, the honest answer is that those can only go on the dim
-tip line and won't glow — don't promise glowing paragraphs; the CLI can't do it.
+verb), this skill does exactly one thing: **short, glowing facts.** There is no
+long / in-depth option and no length question — don't offer one. If a user asks
+for long facts, explain honestly that only short facts can glow (longer text
+would have to live on the dim, non-glowing tip line, which this skill leaves
+alone) rather than promising glowing paragraphs the CLI can't render.
 
 **About the trailing "…":** the spinner appends "…" to every word — that's why
 the defaults read `Discombobulating…`. Your facts get the same "…". It is
